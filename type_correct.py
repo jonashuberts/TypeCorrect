@@ -2,53 +2,50 @@ from pynput import keyboard
 import json
 import os
 
-# Load key layout from JSON configuration
+# Load key layout from a JSON configuration file
 def load_key_layout(layout_name):
-    # Get the absolute path of the directory where the script is located
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    # Construct the full path to the key_layout.json file
-    file_path = os.path.join(script_dir, 'key_layout.json')
-    
+    script_dir = os.path.dirname(os.path.abspath(__file__))  # Get script directory
+    file_path = os.path.join(script_dir, 'key_layout.json')  # Construct file path
     with open(file_path, 'r') as file:
-        layouts = json.load(file)
-        return layouts.get(layout_name)
+        layouts = json.load(file)  # Load JSON data
+        return layouts.get(layout_name)  # Return specific layout
 
-# Track which shift keys are pressed
+# Dictionary to track state of left and right shift keys
 shift_keys = {
     "left": False,
     "right": False
 }
 
-# Initialize controller once
+# Initialize keyboard controller for simulating key presses
 controller = keyboard.Controller()
 
-# Load the desired key layout (e.g., QWERTZ or QWERTY)
-diagonal_keys = load_key_layout("QWERTZ")  # You can change this to "QWERTY" or any other layout
+# Load the specified keyboard layout
+diagonal_keys = load_key_layout("QWERTZ")  # Change layout name as needed
 
+# Function to handle key press events
 def on_press(key):
     try:
         if key == keyboard.Key.shift_l:
-            shift_keys['left'] = True
+            shift_keys['left'] = True  # Track left shift key press
         elif key == keyboard.Key.shift_r:
-            shift_keys['right'] = True
-        
-        # Check only if the pressed key is a character that we care about
+            shift_keys['right'] = True  # Track right shift key press
+
+        # Process character keys based on the loaded layout
         if hasattr(key, 'char') and key.char in diagonal_keys:
-            required_shift = diagonal_keys[key.char]
+            required_shift = diagonal_keys[key.char]  # Determine required shift key
             if not shift_keys[required_shift]:
-                # Block the incorrect input by deleting the character
-                controller.press(keyboard.Key.backspace)
+                controller.press(keyboard.Key.backspace)  # Delete incorrect input
                 controller.release(keyboard.Key.backspace)
     except AttributeError:
-        pass
+        pass  # Ignore non-character keys
 
+# Function to handle key release events
 def on_release(key):
     if key == keyboard.Key.shift_l:
-        shift_keys['left'] = False
+        shift_keys['left'] = False  # Update left shift state
     elif key == keyboard.Key.shift_r:
-        shift_keys['right'] = False
+        shift_keys['right'] = False  # Update right shift state
 
-# Start listening to the keyboard
+# Start the keyboard listener to capture events
 with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
-    listener.join()
+    listener.join()  # Keep the listener active
