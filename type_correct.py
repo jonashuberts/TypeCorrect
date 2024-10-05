@@ -1,3 +1,5 @@
+#MacOS build: python3 -m PyInstaller --onefile --name=TypeCorrect --add-data "key_layout.json:." type_correct.py
+
 from pynput import keyboard
 import json
 import os
