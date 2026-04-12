@@ -29,10 +29,19 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True,
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+)
+app = BUNDLE(
+    exe,
+    name='TypeCorrect.app',
+    icon='app_icon.icns',
+    bundle_identifier=None,
+    info_plist={
+        'LSUIElement': True,
+    },
 )

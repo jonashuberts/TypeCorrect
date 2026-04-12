@@ -1,93 +1,76 @@
 # TypeCorrect
 
-**TypeCorrect** is a Python-based tool designed to enforce the correct use of the left and right `Shift` keys based on keyboard layout. The program ensures that users follow specific diagonal shift rules when typing, making it an ideal tool for those looking to improve their typing habits or for enforcing custom typing rules.
+**TypeCorrect** is a lightweight, background utility for macOS and Windows that enforces the correct use of the left and right `Shift` keys. Designed for touch typists and those looking to break bad typing habits, TypeCorrect silently monitors your keystrokes and ensures you strictly follow diagonal shift rules based on your keyboard layout.
 
 ## Features
 
-- **Enforced Shift Key Usage**: Each key can be mapped to require either the left or right `Shift` key for capital letters, special characters, and umlauts.
-- **Multiple Keyboard Layouts**: TypeCorrect supports different keyboard layouts, like QWERTZ and QWERTY, with the ability to easily add more layouts via a configuration file.
-- **Cross-Platform**: Works on Windows and macOS, with easy startup integration for both platforms.
-- **Customizable Layouts**: Modify and add new layouts with ease using the `key_layout.json` file.
+- **Unobtrusive Background Utility**: Runs seamlessly in the macOS menu bar or Windows system tray without an open terminal.
+- **Strict Shift Enforcement**: Maps every key to precisely require either the left or right `Shift` key for capitalization and special characters. 
+- **On-the-Fly Control**: Instantly toggle enforcement on or off directly from the tray menu.
+- **Dynamic Layout Selection**: Switch between multiple keyboard layouts (like QWERTZ and QWERTY) instantly without restarting or editing code.
+- **Persistent State**: Remembers your preferred layout and enabled/disabled state across system reboots.
+- **Customizable Rulesets**: Easily add or modify keyboard layouts by editing the `key_layout.json` configuration.
 
-## Installation
+## Installation & Setup
+
+TypeCorrect utilizes `uv` for lightning-fast dependency management and `pyinstaller` for building standalone executables.
 
 ### Prerequisites
+- [uv](https://docs.astral.sh/uv/) (Python package manager)
 
-- Python 3.x
-- `pynput` library for keyboard input handling
+### Building from Source
 
-To install the required dependencies, run:
-
-```bash
-pip install pynput
-```
-
-### Download and Setup
-
-1. Clone this repository:
-
+1. **Clone the repository:**
    ```bash
    git clone https://github.com/yourusername/TypeCorrect.git
    cd TypeCorrect
    ```
 
-2. Add your desired keyboard layout (e.g., `QWERTZ`) in the `key_layout.json` file.
+2. **Install dependencies:**
+   ```bash
+   uv sync
+   ```
 
-### Running the Program
+3. **Build the Standalone App:**
+   Compiling the application prevents terminal windows from appearing and integrates TypeCorrect natively into your OS.
 
-To run the program, use the following command:
+   **macOS:**
+   ```bash
+   uv run pyinstaller TypeCorrect.spec
+   ```
+   > [!CAUTION]
+   > macOS strictly governs keyboard listeners. You must run the compiled `.app` file, not the terminal Python script. After building, open the `dist/` folder, double-click `TypeCorrect.app`, and grant it permissions under **System Settings > Privacy & Security > Accessibility**.
 
-```bash
-python type_correct.py
-```
+   **Windows:**
+   ```bash
+   uv run pyinstaller --onefile --noconsole --name=TypeCorrect --add-data "key_layout.json;." type_correct.py
+   ```
 
-## Adding TypeCorrect to Startup
+## Auto-Start Configuration
 
-### Windows
+To have TypeCorrect launch silently in the background when your computer boots:
 
-1. Move the `TypeCorrect.exe` file into your Windows startup folder:
-   - Press `Win + R`, type `shell:startup`, and press Enter.
-   - Copy the `TypeCorrect.exe` file into the opened folder.
-2. TypeCorrect will now run automatically when Windows starts.
+**macOS:**
+1. Move `TypeCorrect.app` from the `dist/` folder into your `Applications/` directory.
+2. Navigate to **System Settings > General > Login Items**.
+3. Click the `+` button and add `TypeCorrect.app`.
 
-### macOS
-
-1. Move the app 'TypeCorrect' from the dist folder to the `Login Items`:
-   - Go to `System Settings > General > Login Items`.
-   - Click the `+` button and add your built app to the list.
-2. The app will now run when macOS starts.
-3. Give the app permissions by going to `System Settings > Security & Privacy > Privacy > Input` and enabling the `Terminal` option and by going to `System Settings > Security & Privacy > Privacy > Accessibility` and enabling the `Terminal` option.
+**Windows:**
+1. Press `Win + R`, type `shell:startup`, and press Enter.
+2. Move the built `TypeCorrect.exe` from the `dist/` folder into the Startup folder that opens.
 
 ## Configuration
 
-The `key_layout.json` file allows you to customize the key bindings for different layouts. It maps each character to the required `Shift` key (`left` or `right`).
+You can fully customize which Shift key is required for any character by modifying the `key_layout.json` file. 
 
-Example `key_layout.json`:
-
+Example mapping:
 ```json
 {
   "QWERTZ": {
     "Q": "right",
-    "W": "right",
-    "E": "right",
-    "R": "right",
-    "T": "right",
-    "Z": "left",
-    "U": "left",
-    "I": "left",
-    "O": "left",
-    "P": "left",
-    "Ä": "left",
-    "Ö": "left",
-    "Ü": "left",
-    "!": "right",
-    "?": "left"
+    "A": "right",
+    "P": "left"
   }
 }
 ```
-
-To load a different layout, modify the layout in the `shift.py` script:
-
-```python
-diagonal_keys = load_key_layout("QWERTZ")  # Change to "QWERTY" if needed
-```
+*Note: Any new layouts added to this JSON file will automatically become selectable in the app's tray menu upon restart.*
