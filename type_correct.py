@@ -9,15 +9,17 @@ import os
 import sys
 import time
 import logging
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 # Setup application data directory in the user's Library folder
 user_app_support = Path.home() / 'Library' / 'Application Support' / 'TypeCorrect'
 user_app_support.mkdir(parents=True, exist_ok=True)
 
-# Setup robust logging
+# Setup robust logging with a strictly limited file size (max 2MB total) to prevent disk space waste
 log_file = Path.home() / 'Library' / 'Logs' / 'TypeCorrect.log'
-logging.basicConfig(filename=str(log_file), level=logging.DEBUG,
+log_handler = RotatingFileHandler(log_file, maxBytes=2*1024*1024, backupCount=1)
+logging.basicConfig(handlers=[log_handler], level=logging.DEBUG,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
 logging.info("Starting TypeCorrect application...")
