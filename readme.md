@@ -8,7 +8,9 @@
 - **Strict Shift Enforcement**: Maps every key to precisely require either the left or right `Shift` key for capitalization and special characters. 
 - **On-the-Fly Control**: Instantly toggle enforcement on or off directly from the tray menu.
 - **Dynamic Layout Selection**: Switch between multiple keyboard layouts (like QWERTZ and QWERTY) instantly without restarting or editing code.
+- **Built-in Troubleshooting**: A dynamic diagnostic UI that constantly monitors your OS permissions and provides 1-click links directly to the macOS exact privacy settings you need.
 - **Persistent State**: Remembers your preferred layout and enabled/disabled state across system reboots.
+- **Micro-Footprint Logging**: Automatically logs events to `~/Library/Logs/TypeCorrect.log` strictly capped at 2MB via rotation so it never bloats your storage over months of background running.
 - **Customizable Rulesets**: Easily add or modify keyboard layouts by editing the `key_layout.json` configuration.
 
 ## Installation & Setup
@@ -38,8 +40,6 @@ TypeCorrect utilizes `uv` for lightning-fast dependency management and `pyinstal
    ```bash
    uv run pyinstaller TypeCorrect.spec
    ```
-   > [!CAUTION]
-   > macOS strictly governs keyboard listeners. You must run the compiled `.app` file, not the terminal Python script. After building, open the `dist/` folder, double-click `TypeCorrect.app`, and grant it permissions under **System Settings > Privacy & Security > Accessibility**.
 
    **Windows:**
    ```bash
@@ -58,6 +58,24 @@ To have TypeCorrect launch silently in the background when your computer boots:
 **Windows:**
 1. Press `Win + R`, type `shell:startup`, and press Enter.
 2. Move the built `TypeCorrect.exe` from the `dist/` folder into the Startup folder that opens.
+
+## 🔒 macOS Security & Permissions (CRITICAL)
+
+macOS strictly governs background keyboard sniffers to prevent malware. TypeCorrect requires **two specific permissions** to function properly on modern macOS versions (Ventura, Sonoma, Sequoia):
+
+1. **Accessibility**: `System Settings > Privacy & Security > Accessibility`
+2. **Input Monitoring**: `System Settings > Privacy & Security > Input Monitoring`
+
+You can use the **Troubleshoot** section directly in the App's tray menu to check your status and access 1-click shortcuts to these specific settings pages.
+
+> [!WARNING]  
+> **Recompilation Bug**: If you ever modify the code and rebuild `TypeCorrect.app` using `pyinstaller`, macOS will secretly recognize that the binary's underlying signature has changed. Even if the switch remains visibly "ON" in System Settings, macOS will silently block the app! 
+> 
+> **To fix a recompiled app:**
+> 1. Open the Privacy Settings page.
+> 2. Click the specific `TypeCorrect` entry in the list.
+> 3. Click the `-` (minus) button at the bottom to **completely delete it**. (Just toggling it off and on WILL NOT work!).
+> 4. Click the `+` button and add your newly compiled `TypeCorrect.app` back into the list.
 
 ## Configuration
 
