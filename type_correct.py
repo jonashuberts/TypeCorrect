@@ -7,40 +7,64 @@ import pystray
 import json
 import os
 import sys
+import time
+import logging
+from pathlib import Path
+
+# Setup application data directory in the user's Library folder
+user_app_support = Path.home() / 'Library' / 'Application Support' / 'TypeCorrect'
+user_app_support.mkdir(parents=True, exist_ok=True)
+
+# Setup robust logging
+log_file = Path.home() / 'Library' / 'Logs' / 'TypeCorrect.log'
+logging.basicConfig(filename=str(log_file), level=logging.DEBUG,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+
+logging.info("Starting TypeCorrect application...")
 
 # Determine the directory where assets will be located. 
 if getattr(sys, 'frozen', False):
     script_dir = sys._MEIPASS
+    # For macOS bundles, datas may go to Resources
+    if 'TypeCorrect.app' in sys.executable:
+        bundle_resources = os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'Resources')
+        if os.path.exists(os.path.join(bundle_resources, 'key_layout.json')):
+            script_dir = bundle_resources
 else:
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
 def load_key_layouts():
     file_path = os.path.join(script_dir, 'key_layout.json')
+    logging.info(f"Looking for key_layout.json at: {file_path}")
+    if not os.path.exists(file_path):
+        logging.error(f"FATAL: key_layout.json not found at {file_path}!")
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
-            return json.load(file)
+            data = json.load(file)
+            logging.info(f"Loaded layouts: {list(data.keys())}")
+            return data
     except Exception as e:
-        print(f"Error loading layouts: {e}")
+        logging.error(f"Error loading layouts: {e}")
         return {"QWERTZ": {}}
 
-app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else script_dir
-settings_path = os.path.join(app_dir, 'settings.json')
+# Save settings to stable App Support directory instead of read-only App Bundle
+settings_path = user_app_support / 'settings.json'
 
 def load_settings():
-    if os.path.exists(settings_path):
+    if settings_path.exists():
         try:
             with open(settings_path, 'r', encoding='utf-8') as file:
                 return json.load(file)
-        except Exception:
-            pass
+        except Exception as e:
+            logging.warning(f"Failed to load settings: {e}")
     return {"enabled": True, "layout": "QWERTZ"}
 
 def save_settings(settings):
     try:
         with open(settings_path, 'w', encoding='utf-8') as file:
             json.dump(settings, file)
-    except Exception:
-        pass
+    except Exception as e:
+        logging.error(f"Failed to save settings: {e}")
 
 settings = load_settings()
 layouts = load_key_layouts()
@@ -63,6 +87,7 @@ shift_keys = {
 controller = keyboard.Controller()
 
 def on_press(key):
+    logging.debug(f"RAW KEY PRESSED: {key}")
     if not app_state["enabled"]:
         return
         
@@ -73,33 +98,33 @@ def on_press(key):
         elif key == keyboard.Key.shift_r:
             shift_keys['right'] = True
         elif str(key) == "Key.shift":
-            print("[DEBUG] OS emitted generic 'Key.shift'. Cannot determine Left/Right layout safely.")
-            # We can't know which one they pressed safely, so maybe mapping both? No, that ruins enforcement.
+            logging.debug("OS emitted generic 'Key.shift'. Cannot determine Left/Right layout safely.")
 
         diagonal_keys = layouts.get(app_state["current_layout"], {})
-        
         char = getattr(key, 'char', None)
         
-        # Log to the terminal for debugging
+        # Log keystroke resolution
         if char:
-            print(f"[DEBUG] Typed: '{char}', LeftShift: {shift_keys['left']}, RightShift: {shift_keys['right']}")
+            logging.debug(f"Typed: '{char}', LShift: {shift_keys['left']}, RShift: {shift_keys['right']}")
             
             if char in diagonal_keys:
                 required_shift = diagonal_keys[char]
-                print(f"[DEBUG] Character '{char}' REQUIRES '{required_shift}' shift.")
+                logging.info(f"Character '{char}' REQUIRES '{required_shift}' shift.")
                 
                 if not shift_keys[required_shift]:
-                    print(f"[DEBUG] Validation FAILED! Attempting to backspace.")
+                    logging.warning(f"Validation FAILED! User missed right shift combo.")
                     try:
+                        # Yield temporarily to OS so the incorrect letter finishes rendering before backspace deletes it
+                        time.sleep(0.02)
                         controller.press(keyboard.Key.backspace)
                         controller.release(keyboard.Key.backspace)
-                        print(f"[DEBUG] Backspace injected.")
+                        logging.info("Backspace injected to block invalid keypress.")
                     except Exception as inner_e:
-                        print(f"[ERROR] Could not press backspace! Do you have Accessibility permissions enabled? Exception: {inner_e}")
+                        logging.error(f"Could not press backspace! Accessibility permissions block? Exception: {inner_e}")
                 else:
-                    print(f"[DEBUG] Validation PASSED.")
+                    logging.info("Validation PASSED.")
     except Exception as e:
-        print(f"[ERROR] in on_press: {e}")
+        logging.error(f"Error in on_press loop: {e}")
 
 def on_release(key):
     if key == keyboard.Key.shift_l:
@@ -161,6 +186,23 @@ def is_layout_checked(layout_name):
         return app_state["current_layout"] == layout_name
     return _check
 
+def check_accessibility():
+    if sys.platform != "darwin": return True
+    try:
+        import ctypes
+        app_services = ctypes.cdll.LoadLibrary('/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices')
+        return bool(app_services.AXIsProcessTrusted())
+    except Exception:
+        return True
+
+def open_accessibility(icon, item):
+    if sys.platform == "darwin":
+        os.system("open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'")
+
+def open_input_monitoring(icon, item):
+    if sys.platform == "darwin":
+        os.system("open 'x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent'")
+
 def quit_app(icon, item):
     icon.stop()
     if app_state["keyboard_listener"]:
@@ -176,9 +218,23 @@ def setup_icon():
             checked=is_layout_checked(layout_name)
         ))
 
+    trusted = check_accessibility()
+    status_label = "🟢 Permissions: OK" if trusted else "🔴 Permissions: MISSING!"
+
+    diagnostic_items = [
+        pystray.MenuItem(status_label, lambda: None, enabled=False),
+        pystray.Menu.SEPARATOR,
+        pystray.MenuItem("1. Open Accessibility Settings", open_accessibility),
+        pystray.MenuItem("2. Open Input Monitoring Settings", open_input_monitoring)
+    ]
+
     menu = pystray.Menu(
         pystray.MenuItem('Enable Enforcement', toggle_enabled, checked=is_enabled),
+        pystray.Menu.SEPARATOR,
         pystray.MenuItem('Layouts', pystray.Menu(*layout_items)),
+        pystray.Menu.SEPARATOR,
+        pystray.MenuItem('Troubleshoot', pystray.Menu(*diagnostic_items)),
+        pystray.Menu.SEPARATOR,
         pystray.MenuItem('Quit', quit_app)
     )
 
@@ -188,7 +244,7 @@ def setup_icon():
     app_state["keyboard_listener"] = keyboard.Listener(on_press=on_press, on_release=on_release)
     app_state["keyboard_listener"].start()
 
-    print("[DEBUG] TypeCorrect is running. Checking logs...")
+    logging.info("Starting pystray user interface...")
     app_state["icon"].run()
 
 if __name__ == "__main__":
